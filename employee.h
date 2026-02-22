@@ -1,10 +1,12 @@
 #pragma once
+#include <istream>
 #include <string>
 #include <iostream>
 
 class Employee
 {
 private:
+  // struct for constant size recording
   struct employeeRecord {
     int id;
     char name[30];
@@ -15,7 +17,7 @@ private:
     char phone[12];
     double salary;
   };
-
+  //attributes of class
   std::string name;
   int id;
   std::string address;
@@ -25,7 +27,12 @@ private:
   std::string phone;
   double salary;
 
+  //private methods
+  void seek(std::iostream &ios) const;
+  static std::string to_lower(std::string st);//helper to consisly convert strings to lower
+  
 public:
+  //public methods
   void display(std::ostream &os) const;
   void write(std::ostream &os) const;
   void store(std::iostream &is) const;
