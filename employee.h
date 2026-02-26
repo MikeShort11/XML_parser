@@ -9,12 +9,12 @@ private:
   // struct for constant size recording
   struct employeeRecord {
     int id;
-    char name[30];
-    char address[20];
-    char city[20];
-    char state[20];
-    char country[20];
-    char phone[12];
+    char name[31];
+    char address[26];
+    char city[21];
+    char state[21];
+    char country[21];
+    char phone[21];
     double salary;
   };
   // attributes of class
@@ -28,7 +28,7 @@ private:
    double salary;
 
   //private methods
-  void seek(std::iostream &ios) const;
+  static std::streampos seek(std::istream &ios, const int &id);
   static std::string to_lower(std::string st);//helper to consisly convert strings to lower
   
 public:
@@ -62,7 +62,8 @@ public:
   void display(std::ostream &os) const;
   void write(std::ostream &os) const;
   void store(std::iostream &is) const;
-  Employee *read(std::istream &is);
-  Employee *retrieve(std::istream &is, int id);
+  // ask about these being static
+  static Employee *read(std::istream &is);
+  static Employee *retrieve(std::istream &is, int id);
   static Employee *fromXML(std::istream &is);
 };

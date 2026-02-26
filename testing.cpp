@@ -13,16 +13,17 @@ void run_unit_tests() {
     std::cout << "--- Starting Unit Tests ---\n";
 
     // 1. Test fromXML with required fields (Happy Path) 
-    std::string valid_xml = "<Employee><id>12345</id><name>Mike Tutor</name></Employee>";
+    std::string valid_xml = "<Employee>\n  <id> 12345</id>\n  \n<name>Mike Tutor</name> \n</Employee> \n";
     std::stringstream ss(valid_xml);
     Employee* emp = Employee::fromXML(ss);
     
     assert(emp != nullptr && "fromXML failed on valid input");
     assert(emp->getId() == 12345); // Assuming getId() exists
+    assert(emp->getName() == "Mike Tutor");
     std::cout << "Unit Test 1 (Happy Path): Passed\n";
 
     // 2. Test fromXML case insensitivity 
-    std::string case_xml = "<EMPLOYEE><ID>99</ID><NAME>test</NAME></EMPLOYEE>";
+    std::string case_xml = "<EMPLOYEE><name></name><ID>99</ID></EMPLOYEE>";
     std::stringstream ss2(case_xml);
     Employee* emp2 = Employee::fromXML(ss2);
     assert(emp2 != nullptr && emp2->getId() == 99);

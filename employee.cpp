@@ -1,4 +1,6 @@
 #include "employee.h"
+#include <iosfwd>
+#include <istream>
 #include <stdexcept>
 #include <algorithm>
 #include <string>
@@ -41,6 +43,23 @@ void Employee::setCountry(std::string ctry){this->country = ctry;}
 void Employee::setPhone(std::string phone){this->phone = phone;}
 void Employee::setSalary(double salary){this->salary = salary;}
 
+// ios is supposes to be is, i initially make it an iostream, but need it to be istream
+std::streampos Employee::seek(std::istream &ios, const int &id){
+  ios.seekg(0, std::ios::beg);
+  employeeRecord temp;
+  std::streampos foundPos;
+
+  //search for the record
+  while (ios.read(reinterpret_cast<char*>(&temp), sizeof(employeeRecord))) {
+      if (temp.id == id) {
+          foundPos = ios.tellg() - static_cast<std::streamoff>(sizeof(employeeRecord));
+          return foundPos;
+      }
+  }
+  ios.clear(); //remove and eof or other flags for the function calling
+  return std::streampos(-1); //record not found
+}
+
 void Employee::display(std::ostream &os) const
 {
   os << "ID: " << id << std::endl;
@@ -61,115 +80,163 @@ void Employee::write(std::ostream &os) const
   record.id = this->id;
   record.salary = this->salary;
   //copy strings into char arrays, use larges size allowed with null terminator
-  this->name.copy(record.name, sizeof(record.name) - 1);
-  this->address.copy(record.address, sizeof(record.address) - 1);
-  this->city.copy(record.city, sizeof(record.city) - 1);
-  this->state.copy(record.state, sizeof(record.state) - 1);
-  this->country.copy(record.country, sizeof(record.country) - 1);
-  this->phone.copy(record.phone, sizeof(record.phone) - 1);
+  // i forgot about the null terminators, that became a pain in testing
+  record.name[this->name.copy(record.name, sizeof(record.name) - 1)] = '\0';
+  record.address[this->address.copy(record.address, sizeof(record.address) - 1)] = '\0';
+  record.city[this->city.copy(record.city, sizeof(record.city) - 1)] = '\0';
+  record.state[this->state.copy(record.state, sizeof(record.state) - 1)] = '\0';
+  record.country[this->country.copy(record.country, sizeof(record.country) - 1)] = '\0';
+  record.phone[this->phone.copy(record.phone, sizeof(record.phone) - 1)] = '\0';
   //reinterpret record as binary data and write it to the stream
   os.write(reinterpret_cast<char*>(&record), sizeof(record));
+}
+
+void Employee::store(std::iostream &ios) const {
+  //nice DRY seek method
+  std::streampos recordPos = seek(ios, this->id);
+  ios.clear();
+
+  //move stream to the right position
+  if (recordPos != std::streampos(-1)) {
+      ios.seekp(recordPos);
+  } else {
+      ios.seekp(0, std::ios::end);
   }
 
-  Employee *Employee::fromXML(std::istream &is)
-  {
-    bool in_employee = false;
-    bool name_found = false;
-    bool id_found = false;
-    bool address_found = false;
-    bool state_found = false;
-    bool country_found = false;
-    bool phone_found = false;
-    bool city_found = false;
-    bool salary_found = false;
+  //write the record
+  this->write(ios);
+  // i saw this online
+  ios.flush();
+}
 
-    std::string chunk;
-    std::string open_tag;
-    std::string closing_tag;
-    std::string data;
-
-    
-    while ((getline(is, chunk, '<'))){ // read to the first tag open
-      // read to tag close, if it dosent exist return null
-      if (!std::getline(is, open_tag, '>')) return nullptr; 
-      open_tag = Employee::to_lower(open_tag);
-      if (open_tag == "employee") { // employee open tag found
-        // we are inside an eployee object
-        in_employee = true;
-        break;
-      };
-    };
-    if (!in_employee) return nullptr; // if no employee is found return nullptr
-    //Now we have exited a tag and can start getting data
-    Employee *emp = new Employee(); // default employee DELETE THIS IF YOU THROW BELOW THIS LINE ---> _____________
-
-    while ((getline(is, chunk, '<'))){ // now we are looking for an internal tag
-      //read to >, catch unexpected EOF and conver tag to lowercase
-      if (!getline(is, open_tag, '>')) throw std::runtime_error("Unexpected EOF");
-      open_tag = to_lower(open_tag);
-       
-      // now we are inside a tag inside an emplyee
-      //read to the next tag start
-      // check that the data is not repeated in the XML and throw if it is
-      // also check that the tag is a valid value
-      getline(is, data, '<');
-      //apparently c++ switch cases cant compare strings
-      if (open_tag == "name") {
-          if (name_found) { delete emp; throw std::runtime_error("Multiple <name> tags"); }
-          emp->name = data;
-          name_found = true;
-      }
-      else if (open_tag == "address") {
-          if (address_found) { delete emp; throw std::runtime_error("Multiple <address> tags"); }
-          emp->address = data;
-          address_found = true;
-      }
-      else if (open_tag == "city") {
-          if (city_found) { delete emp; throw std::runtime_error("Multiple <city> tags"); }
-          emp->city = data;
-          city_found = true;
-      }
-      else if (open_tag == "state") {
-          if (state_found) { delete emp; throw std::runtime_error("Multiple <state> tags"); }
-          emp->state = data;
-          state_found = true;
-      }
-      else if (open_tag == "country") {
-          if (country_found) { delete emp; throw std::runtime_error("Multiple <country> tags"); }
-          emp->country = data;
-          country_found = true;
-      }
-      else if (open_tag == "phone") {
-          if (phone_found) { delete emp; throw std::runtime_error("Multiple <phone> tags"); }
-          emp->phone = data;
-          phone_found = true;
-      }
-      else if (open_tag == "id") {
-          if (id_found) { delete emp; throw std::runtime_error("Multiple <id> tags"); }
-          emp->id = std::stoi(data);
-          id_found = true;
-      }
-      else if (open_tag == "salary") {
-          if (salary_found) { delete emp; throw std::runtime_error("Multiple <salary> tags"); }
-          emp->salary = std::stod(data);
-          salary_found = true;
-      }
-      else if (open_tag == "/employee") {
-        in_employee = false;
-        break;
-      }
-      else {
-          delete emp;
-          throw std::runtime_error("Invalid tag: <" + open_tag + ">");
-      }
-
-      // now we are ready to go to the closing tag and start over
-      std::getline(is, closing_tag, '>');
-      if (to_lower(closing_tag) != "/" + open_tag) { //check that the closing tag is what we expect
-          delete emp;
-          throw std::runtime_error("Missing </" + open_tag + "> tag");
-      }
-    }    
-    if (!name_found || !id_found) {delete emp; throw std::runtime_error("Name or ID not provided");}
-    return emp; // return the final employee
+Employee *Employee::read(std::istream &is){
+  employeeRecord record;
+  
+  if (!is.read(reinterpret_cast<char*>(&record), sizeof(record))){
+    return nullptr;
   };
+  //this looks weird, but i didnt want it all one line, i cant make it look nice in helix
+  Employee *emp = new Employee(record.id,
+                                record.name,
+                                record.salary,
+                                 record.address,
+                                 record.city,
+                                  record.state,
+                                   record.country,
+                                    record.phone);
+  return emp;
+}
+
+Employee *Employee::retrieve(std::istream &is, int id) {
+  std::streampos recordPos = seek(is, id);
+  if (recordPos == -1){
+    return nullptr;
+  }
+  is.clear();
+  is.seekg(recordPos);
+  Employee *emp = read(is);
+  return emp;
+}
+
+Employee *Employee::fromXML(std::istream &is)
+{
+  bool in_employee = false;
+  bool name_found = false;
+  bool id_found = false;
+  bool address_found = false;
+  bool state_found = false;
+  bool country_found = false;
+  bool phone_found = false;
+  bool city_found = false;
+  bool salary_found = false;
+
+  std::string chunk;
+  std::string open_tag;
+  std::string closing_tag;
+  std::string data;
+
+  
+  while ((getline(is, chunk, '<'))){ // read to the first tag open
+    // read to tag close, if it dosent exist return null
+    if (!std::getline(is, open_tag, '>')) return nullptr; 
+    open_tag = Employee::to_lower(open_tag);
+    if (open_tag == "employee") { // employee open tag found
+      // we are inside an eployee object
+      in_employee = true;
+      break;
+    };
+  };
+  if (!in_employee) return nullptr; // if no employee is found return nullptr
+  //Now we have exited a tag and can start getting data
+  Employee *emp = new Employee(); // default employee DELETE THIS IF YOU THROW BELOW THIS LINE ---> _____________
+
+  while ((getline(is, chunk, '<'))){ // now we are looking for an internal tag
+    //read to >, catch unexpected EOF and conver tag to lowercase
+    if (!getline(is, open_tag, '>')) throw std::runtime_error("Unexpected EOF");
+    open_tag = to_lower(open_tag);
+     
+    // now we are inside a tag inside an emplyee
+    //read to the next tag start
+    // check that the data is not repeated in the XML and throw if it is
+    // also check that the tag is a valid value
+    getline(is, data, '<');
+    //apparently c++ switch cases cant compare strings
+    if (open_tag == "name") {
+        if (name_found) { delete emp; throw std::runtime_error("Multiple <name> tags"); }
+        emp->name = data;
+        name_found = true;
+    }
+    else if (open_tag == "address") {
+        if (address_found) { delete emp; throw std::runtime_error("Multiple <address> tags"); }
+        emp->address = data;
+        address_found = true;
+    }
+    else if (open_tag == "city") {
+        if (city_found) { delete emp; throw std::runtime_error("Multiple <city> tags"); }
+        emp->city = data;
+        city_found = true;
+    }
+    else if (open_tag == "state") {
+        if (state_found) { delete emp; throw std::runtime_error("Multiple <state> tags"); }
+        emp->state = data;
+        state_found = true;
+    }
+    else if (open_tag == "country") {
+        if (country_found) { delete emp; throw std::runtime_error("Multiple <country> tags"); }
+        emp->country = data;
+        country_found = true;
+    }
+    else if (open_tag == "phone") {
+        if (phone_found) { delete emp; throw std::runtime_error("Multiple <phone> tags"); }
+        emp->phone = data;
+        phone_found = true;
+    }
+    else if (open_tag == "id") {
+        if (id_found) { delete emp; throw std::runtime_error("Multiple <id> tags"); }
+        emp->id = std::stoi(data);
+        id_found = true;
+    }
+    else if (open_tag == "salary") {
+        if (salary_found) { delete emp; throw std::runtime_error("Multiple <salary> tags"); }
+        emp->salary = std::stod(data);
+        salary_found = true;
+    }
+    else if (open_tag == "/employee") {
+      in_employee = false;
+      break;
+    }
+    else {
+        delete emp;
+        throw std::runtime_error("Invalid tag: <" + open_tag + ">");
+    }
+
+    // now we are ready to go to the closing tag and start over
+    std::getline(is, closing_tag, '>');
+    if (to_lower(closing_tag) != "/" + open_tag) { //check that the closing tag is what we expect
+        delete emp;
+        throw std::runtime_error("Missing </" + open_tag + "> tag");
+    }
+  }    
+  if (!name_found || !id_found) {delete emp; throw std::runtime_error("Name or ID not provided");}
+  return emp; // return the final employee
+};
